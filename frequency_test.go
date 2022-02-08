@@ -1,6 +1,7 @@
 package frequency
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -11,72 +12,11 @@ import (
 var timeLayout = "2006-01-02T15:04:05.000"
 
 func TestParseFrequency(t *testing.T) {
-	var tests = []struct {
-		s       string
-		want    Frequency
-		wantErr bool
-	}{
-		{s: `100s`, want: Frequency{duration: 100 * time.Second, unit: "s"}},
-		{s: `2m`, want: Frequency{duration: 2 * time.Minute, unit: "m"}},
-		{s: `2mo`, want: Frequency{months: 2, unit: "mo"}},
-		{s: `2h`, want: Frequency{duration: 2 * time.Hour, unit: "h"}},
-		{s: `2d`, want: Frequency{days: 2, unit: "d"}},
-		{s: `15d`, want: Frequency{days: 15, unit: "d"}},
-		{s: `2w`, want: Frequency{weeks: 2, unit: "w"}},
-		{s: `2y`, want: Frequency{years: 2, unit: "y"}},
-		{s: `-5s`, want: Frequency{duration: -5 * time.Second, unit: "s"}},
-		{s: `25h`, wantErr: true}, // after 24h, the minimum resolution becomes 1 day
-		{s: `1h30m`, wantErr: true},
-		{s: `-5m30s`, wantErr: true},
-		{s: `3mm`, wantErr: true},
-		{s: ``, wantErr: true},
-		{s: `0s`, wantErr: true},
-		{s: `3`, wantErr: true},
-		{s: `3nm`, wantErr: true},
-		{s: `1000`, wantErr: true},
-		{s: `w`, wantErr: true},
-		{s: `ms`, wantErr: true},
-		{s: `1.2w`, wantErr: true},
-		{s: `10x`, wantErr: true},
-	}
-
-	for i, tt := range tests {
-		t.Run(fmt.Sprintf("%d: parse %s", i, tt.s), func(t *testing.T) {
-			got, err := ParseFrequency(tt.s)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if got != tt.want {
-				t.Errorf("Parse() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	testParseFrequency(t, "ParseFrequency", func(f string) (Frequency, error) { return ParseFrequency(f) })
 }
 
-func TestFormatFrequency(t *testing.T) {
-	var tests = []struct {
-		f    Frequency
-		want string
-	}{
-		{f: Frequency{duration: 100 * time.Second, unit: "s"}, want: `100s`},
-		{f: Frequency{duration: 2 * time.Minute, unit: "m"}, want: `2m`},
-		{f: Frequency{duration: 2 * time.Hour, unit: "h"}, want: `2h`},
-		{f: Frequency{days: 2, unit: "d"}, want: `2d`},
-		{f: Frequency{weeks: 3, unit: "w"}, want: `3w`},
-		{f: Frequency{months: 1, unit: "mo"}, want: `1mo`},
-		{f: Frequency{years: 4, unit: "y"}, want: `4y`},
-	}
-
-	for i, tt := range tests {
-		t.Run(fmt.Sprintf("%d: want %s", i, tt.want), func(t *testing.T) {
-			got := tt.f.String()
-			if got != tt.want {
-				t.Errorf("Format() = %s, want %s", got, tt.want)
-			}
-		})
-	}
+func TestString(t *testing.T) {
+	stringOutputTest(t, "String", func(f Frequency) (string, error) { return f.String(), nil })
 }
 
 func TestIdempotency(t *testing.T) {
@@ -201,6 +141,13 @@ type tstStruct struct {
 	} `yaml:"test" json:"test"`
 }
 
+func TestMarshalYAML(t *testing.T) {
+	stringOutputTest(t, "MarshalYAML", func(f Frequency) (string, error) {
+		bytes, err := f.MarshalYAML()
+		return string(bytes), err
+	})
+}
+
 func TestUnmarshalYAML(t *testing.T) {
 	var tests = []struct {
 		yml     string
@@ -229,6 +176,149 @@ test:
 
 			if got.Test.Frequency != tt.want {
 				t.Errorf("UnmarshalYAML() = %s, want %s", got.Test.Frequency, tt.want)
+			}
+		})
+	}
+}
+
+func TestMarshalJSON(t *testing.T) {
+	var tests = []struct {
+		f    Frequency
+		want string
+	}{
+		{f: Frequency{duration: 100 * time.Second, unit: "s"}, want: `"100s"`},
+		{f: Frequency{duration: 2 * time.Minute, unit: "m"}, want: `"2m"`},
+		{f: Frequency{duration: 2 * time.Hour, unit: "h"}, want: `"2h"`},
+		{f: Frequency{days: 2, unit: "d"}, want: `"2d"`},
+		{f: Frequency{weeks: 3, unit: "w"}, want: `"3w"`},
+		{f: Frequency{months: 1, unit: "mo"}, want: `"1mo"`},
+		{f: Frequency{years: 4, unit: "y"}, want: `"4y"`},
+	}
+
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d: want %s", i, tt.want), func(t *testing.T) {
+			got, err := json.Marshal(&tt.f)
+			if err != nil {
+				t.Errorf("json.Marshal(): got error: %s", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("json.Marshal() = %s, want %s", string(got), tt.want)
+			}
+		})
+	}
+}
+
+func TestUnmarshalJSON(t *testing.T) {
+	var tests = []struct {
+		json    string
+		want    Frequency
+		wantErr bool
+	}{
+		{json: `{"test": {"frequency":"5s"}}`, want: Frequency{duration: 5 * time.Second, unit: "s"}},
+		{json: `{"test": {"frequency":"5m"}}`, want: Frequency{duration: 5 * time.Minute, unit: "m"}},
+		{json: `{"test": {"frequency":"5"}}`, wantErr: true},
+		{json: `{"test": {"frequency":""}}`},
+	}
+
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			got := tstStruct{}
+			err := json.Unmarshal([]byte(tt.json), &got)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("json.Unmarshal(%s) error = %v, wantErr %v, want %s", tt.json, err, tt.wantErr, tt.want.String())
+				return
+			}
+
+			if got.Test.Frequency != tt.want {
+				t.Errorf("UmarshalJSON() = %s, want %s", got.Test.Frequency, tt.want)
+			}
+		})
+	}
+}
+
+func TestMarshalText(t *testing.T) {
+	stringOutputTest(t, "MarshalText", func(f Frequency) (string, error) {
+		bytes, err := f.MarshalText()
+		return string(bytes), err
+
+	})
+}
+
+func TestUnmarshalText(t *testing.T) {
+	testParseFrequency(t, "UnmarshalText", func(f string) (Frequency, error) {
+		var fr Frequency
+		err := fr.UnmarshalText([]byte(f))
+		return fr, err
+	})
+}
+
+func testParseFrequency(t *testing.T, name string, fn func(f string) (Frequency, error)) {
+	var tests = []struct {
+		s       string
+		want    Frequency
+		wantErr bool
+	}{
+		{s: `100s`, want: Frequency{duration: 100 * time.Second, unit: "s"}},
+		{s: `2m`, want: Frequency{duration: 2 * time.Minute, unit: "m"}},
+		{s: `2mo`, want: Frequency{months: 2, unit: "mo"}},
+		{s: `2h`, want: Frequency{duration: 2 * time.Hour, unit: "h"}},
+		{s: `2d`, want: Frequency{days: 2, unit: "d"}},
+		{s: `15d`, want: Frequency{days: 15, unit: "d"}},
+		{s: `2w`, want: Frequency{weeks: 2, unit: "w"}},
+		{s: `2y`, want: Frequency{years: 2, unit: "y"}},
+		{s: `-5s`, want: Frequency{duration: -5 * time.Second, unit: "s"}},
+		{s: ``},
+		{s: `25h`, wantErr: true}, // after 24h, the minimum resolution becomes 1 day
+		{s: `1h30m`, wantErr: true},
+		{s: `-5m30s`, wantErr: true},
+		{s: `3mm`, wantErr: true},
+		{s: `0s`, wantErr: true},
+		{s: `3`, wantErr: true},
+		{s: `3nm`, wantErr: true},
+		{s: `1000`, wantErr: true},
+		{s: `w`, wantErr: true},
+		{s: `ms`, wantErr: true},
+		{s: `1.2w`, wantErr: true},
+		{s: `10x`, wantErr: true},
+	}
+
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d: %s %s", i, name, tt.s), func(t *testing.T) {
+			got, err := fn(tt.s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("%s() error = %v, wantErr %v", name, err, tt.wantErr)
+				return
+			}
+
+			if got != tt.want {
+				t.Errorf("%s() = %v, want %v", name, got, tt.want)
+			}
+		})
+	}
+}
+
+func stringOutputTest(t *testing.T, name string, fn func(f Frequency) (string, error)) {
+	var tests = []struct {
+		f    Frequency
+		want string
+	}{
+		{f: Frequency{duration: 100 * time.Second, unit: "s"}, want: `100s`},
+		{f: Frequency{duration: 2 * time.Minute, unit: "m"}, want: `2m`},
+		{f: Frequency{duration: 2 * time.Hour, unit: "h"}, want: `2h`},
+		{f: Frequency{days: 2, unit: "d"}, want: `2d`},
+		{f: Frequency{weeks: 3, unit: "w"}, want: `3w`},
+		{f: Frequency{months: 1, unit: "mo"}, want: `1mo`},
+		{f: Frequency{years: 4, unit: "y"}, want: `4y`},
+	}
+
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d: want %s", i, tt.want), func(t *testing.T) {
+			got, err := fn(tt.f)
+			if err != nil {
+				t.Errorf("%s(): got error: %s", name, err)
+			}
+			if got != tt.want {
+				t.Errorf("%s() = %s, want %s", name, got, tt.want)
 			}
 		})
 	}

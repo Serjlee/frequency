@@ -1,6 +1,7 @@
 package frequency
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -34,6 +35,10 @@ type Frequency struct {
 // The total seconds, minutes, and hours must equal less than a full day: after that, you must use days, weeks, months or years
 // This func will also be used to Unmarshal from YAML/JSON
 func ParseFrequency(s string) (d Frequency, err error) {
+	if s == "" {
+		return NilFrequency, nil
+	}
+
 	if len(s) < 2 {
 		return NilFrequency, ErrInvalidFrequency
 	}
@@ -200,6 +205,11 @@ func (f *Frequency) Set(data string) error {
 	return err
 }
 
+// MarshalYAML Implements the Marshaler interface of the yaml pkg
+func (f *Frequency) MarshalYAML() ([]byte, error) {
+	return []byte(f.String()), nil
+}
+
 // UnmarshalYAML Implements the Unmarshaler interface of the yaml pkg
 func (f *Frequency) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var buf string
@@ -210,9 +220,24 @@ func (f *Frequency) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return f.Set(buf)
 }
 
+// MarshalJSON Implements the Marshaler interface of the json pkg
+func (f *Frequency) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, f)), nil
+}
+
 // UnmarshalJSON Implements the Unmarshaler interface of the json pkg
 func (f *Frequency) UnmarshalJSON(data []byte) error {
-	return f.Set(string(data))
+	var str string
+	err := json.Unmarshal(data, &str)
+	if err != nil {
+		return err
+	}
+	return f.Set(str)
+}
+
+// MarshalText Implements the Marshaler interface of the encoding pkg
+func (f *Frequency) MarshalText() ([]byte, error) {
+	return []byte(f.String()), nil
 }
 
 // UnmarshalText Implements the TextUnmarshaler interface of the encoding pkg
