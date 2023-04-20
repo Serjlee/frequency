@@ -135,6 +135,33 @@ func TestFromDuration(t *testing.T) {
 	}
 }
 
+func TestAsDuration(t *testing.T) {
+	var tests = []struct {
+		want time.Duration
+		f    Frequency
+	}{
+		{want: 100 * time.Second, f: Frequency{duration: 100 * time.Second, unit: "s"}},
+		{want: 2 * time.Minute, f: Frequency{duration: 2 * time.Minute, unit: "m"}},
+		{want: 2*time.Minute + 30*time.Second, f: Frequency{duration: 150 * time.Second, unit: "s"}},
+		{want: 2 * time.Hour, f: Frequency{duration: 2 * time.Hour, unit: "h"}},
+		{want: 25 * time.Hour, f: Frequency{duration: 25 * time.Hour, unit: "h"}},
+		{want: 24 * time.Hour * 7, f: Frequency{weeks: 1, unit: "w"}},
+		{want: 24 * time.Hour * 8, f: Frequency{days: 8, unit: "d"}},
+		{want: 24 * time.Hour * 30, f: Frequency{months: 1, unit: "mo"}},
+		{want: 24 * time.Hour * 365, f: Frequency{years: 1, unit: "y"}},
+		{want: 1 * time.Second, f: Frequency{duration: 1 * time.Second, unit: "s"}},
+	}
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d: toDuration %s", i, tt.f), func(t *testing.T) {
+			got := tt.f.AsDuration()
+
+			if got != tt.want {
+				t.Errorf("Parse() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 type tstStruct struct {
 	Test struct {
 		Frequency Frequency `yaml:"frequency" json:"frequency"`

@@ -184,6 +184,11 @@ func (d Frequency) IsZero() bool {
 	return d.duration == 0 && d.days == 0 && d.weeks == 0 && d.months == 0 && d.years == 0
 }
 
+// AsDuration returns the value as a time.Duration
+func (d Frequency) AsDuration() time.Duration {
+	return d.duration + time.Hour*24*time.Duration(d.days) + time.Hour*24*7*time.Duration(d.weeks) + time.Hour*24*30*time.Duration(d.months) + time.Hour*24*365*time.Duration(d.years)
+}
+
 // ShouldRun returns true if, given the time of the last run and the current time, the time is up
 func (d Frequency) ShouldRun(lastRun, currentTime time.Time) bool {
 	return currentTime.After(d.NextRun(lastRun))
