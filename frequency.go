@@ -103,10 +103,6 @@ unit:
 		return NilFrequency, ErrInvalidFrequency
 	}
 
-	if d.duration >= time.Hour*24 {
-		return NilFrequency, ErrInvalidFrequency
-	}
-
 	if isNegative {
 		d.duration = -d.duration
 		d.days = -d.days

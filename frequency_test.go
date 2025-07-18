@@ -123,6 +123,7 @@ func TestFromDuration(t *testing.T) {
 		{d: 24 * time.Hour * 7, want: Frequency{weeks: 1, unit: "w"}},
 		{d: 24 * time.Hour * 8, want: Frequency{days: 8, unit: "d"}},
 		{d: 25 * time.Millisecond, want: Frequency{duration: 1 * time.Second, unit: "s"}},
+		{d: 24 * time.Hour, want: Frequency{unit: "d", days: 1}},
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("%d: parse %s", i, tt.d), func(t *testing.T) {
@@ -295,7 +296,7 @@ func testParseFrequency(t *testing.T, name string, fn func(f string) (Frequency,
 		{s: `2y`, want: Frequency{years: 2, unit: "y"}},
 		{s: `-5s`, want: Frequency{duration: -5 * time.Second, unit: "s"}},
 		{s: ``},
-		{s: `25h`, wantErr: true}, // after 24h, the minimum resolution becomes 1 day
+		{s: `25h`, want: Frequency{duration: 25 * time.Hour, unit: "h"}}, // after 24h, the minimum resolution becomes 1 day
 		{s: `1h30m`, wantErr: true},
 		{s: `-5m30s`, wantErr: true},
 		{s: `3mm`, wantErr: true},
